@@ -2,28 +2,39 @@ package eu.slipo.athenarc.triplegeo;
 
 
 //Execute
-// spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[3] ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar  test/conf/shp_options.conf
+// spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[3] ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar  test/conf/spark_shp_options.conf
+// java -cp ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar eu.slipo.athenarc.triplegeo.Extractor test/conf/shp_options.conf
 
+
+import com.linuxense.javadbf.DBFField;
+import com.linuxense.javadbf.DBFReader;
 import com.vividsolutions.jts.geom.Geometry;
 import eu.slipo.athenarc.triplegeo.utils.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.TaskContext;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.api.java.function.ForeachFunction;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.datasyslab.geospark.formatMapper.shapefileParser.ShapefileReader;
 import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
 import org.datasyslab.geospark.spatialRDD.SpatialRDD;
+import org.datasyslab.geosparksql.utils.Adapter;
+import org.datasyslab.geosparksql.utils.DataFrameFactory;
 
+
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
+import java.util.Map;
 
 
 public class SparkExtractor {
@@ -123,9 +134,32 @@ public class SparkExtractor {
                     System.out.println("No classification hierarchy specified for features to be extracted.");
             }
 
-            System.out.println("\n\n\n\n\n\n\n\n");
+            //----------------------------------------------------------------------------------------------------------
+            //----------------------------------------------------------------------------------------------------------
 
+            System.out.println(inputFile);
+            InputChecker ic = new InputChecker(inputFile);
+            if(!ic.check()){
+                System.out.println(ic.getError());
+                System.exit(0);
+            }
 
+            String dbf_file = ic.getFile("dbf");
+            DBFReader dbf_reader;
+            List<String> dbf_fields = new ArrayList<String>();
+            try {
+                dbf_reader = new DBFReader(new FileInputStream(dbf_file));
+                int numberOfFields = dbf_reader.getFieldCount();
+                for (int i = 0; i < numberOfFields; i++) {
+                    DBFField field = dbf_reader.getField(i);
+                    dbf_fields.add(field.getName());
+                }
+            }
+            catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            // spark's part
             SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
                     .setMaster("local[*]")
                     .set("spark.hadoop.validateOutputSpecs", "false")
@@ -142,33 +176,42 @@ public class SparkExtractor {
             JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sc);
 
             SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
-            System.out.println (inputFile);
             spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inputFile);
 
-            /*spatialRDD.rawSpatialRDD
-                    .repartition(3)
-                    .mapPartitionsWithIndex(new Function2<Integer, Iterator<String>, Iterator<String>>(){
-                        public Iterator<String> call(Integer index, Iterator<String> iter){
-                            String outFile = outputFiles.get(outputFiles.size()-1) + "_" + index;
-                            new Task(currentConfig, classification, inputFile, outFile, sourceSRID, targetSRID);
-
-                            return iter;
-                        }
-                }, true)
-                .collect();
-             */
             spatialRDD.rawSpatialRDD
                     .repartition(3)
-                    .foreachPartition(new VoidFunction<Iterator>() {
+                    .foreachPartition(new VoidFunction<Iterator<Geometry>>() {
                         @Override
-                        public void call(Iterator iterator) throws Exception {
+                        public void call(Iterator<Geometry> geometry_iter) {
                             String outFile = outputFiles.get(outputFiles.size()-1);
                             outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf(".") , "_" + TaskContext.getPartitionId()).toString();
-                            new Task(currentConfig, classification, inputFile, outFile, sourceSRID, targetSRID);
+                            while(geometry_iter.hasNext()) {
+                                int partion_index = TaskContext.getPartitionId();
+                                Geometry geometry = geometry_iter.next();
+                                String[] userData = geometry.getUserData().toString().split("\t");
+                                String wkt = geometry.toText();
+                                for(int i = 0; i< dbf_fields.size(); i++){
+                                    System.out.println(dbf_fields.get(i) +" : " + userData[i]);
+                                }
+                                System.out.println("\n\n");
+                            }
                         }
                     });
 
 
+                    /*
+
+                    // For DataFremes purposes
+                    SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
+                    spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inputFile);
+                    Dataset<Row> df =  Adapter.toDf(spatialRDD, session);
+                    df.foreach(new ForeachFunction<Row>() {
+                        @Override
+                        public void call(Row row) throws Exception {
+                            System.out.println("----> "+ row);
+
+                        }
+                    });*/
 
         }
     }
