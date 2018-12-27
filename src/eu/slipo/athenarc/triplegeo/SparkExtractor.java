@@ -9,6 +9,7 @@ package eu.slipo.athenarc.triplegeo;
 import com.linuxense.javadbf.DBFField;
 import com.linuxense.javadbf.DBFReader;
 import com.vividsolutions.jts.geom.Geometry;
+import eu.slipo.athenarc.triplegeo.tools.SparkShpToRdf;
 import eu.slipo.athenarc.triplegeo.utils.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.spark.SparkConf;
@@ -27,14 +28,18 @@ import org.datasyslab.geospark.spatialRDD.SpatialRDD;
 import org.datasyslab.geosparksql.utils.Adapter;
 import org.datasyslab.geosparksql.utils.DataFrameFactory;
 
+import org.geotools.data.DataUtilities;
+import org.geotools.feature.FeatureIterator;
+import org.geotools.feature.simple.SimpleFeatureBuilder;
+import org.geotools.feature.simple.SimpleFeatureImpl;
+import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
 
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 public class SparkExtractor {
@@ -181,37 +186,31 @@ public class SparkExtractor {
             spatialRDD.rawSpatialRDD
                     .repartition(3)
                     .foreachPartition(new VoidFunction<Iterator<Geometry>>() {
-                        @Override
-                        public void call(Iterator<Geometry> geometry_iter) {
-                            String outFile = outputFiles.get(outputFiles.size()-1);
-                            outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf(".") , "_" + TaskContext.getPartitionId()).toString();
-                            while(geometry_iter.hasNext()) {
-                                int partion_index = TaskContext.getPartitionId();
-                                Geometry geometry = geometry_iter.next();
-                                String[] userData = geometry.getUserData().toString().split("\t");
-                                String wkt = geometry.toText();
-                                for(int i = 0; i< dbf_fields.size(); i++){
-                                    System.out.println(dbf_fields.get(i) +" : " + userData[i]);
-                                }
-                                System.out.println("\n\n");
-                            }
-                        }
-                    });
+                @Override
+                public void call(Iterator<Geometry> geometry_iter) {
+                    int partion_index = TaskContext.getPartitionId();
+                    String outFile = outputFiles.get(outputFiles.size() - 1);
+                    outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
 
-
-                    /*
-
-                    // For DataFremes purposes
-                    SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
-                    spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inputFile);
-                    Dataset<Row> df =  Adapter.toDf(spatialRDD, session);
-                    df.foreach(new ForeachFunction<Row>() {
-                        @Override
-                        public void call(Row row) throws Exception {
-                            System.out.println("----> "+ row);
-
-                        }
-                    });*/
+                    List<Map<String, String>> listMap = new ArrayList<>();
+                    List<String> wkt = new ArrayList<>();
+                    while (geometry_iter.hasNext()) {
+                        Geometry geometry = geometry_iter.next();
+                        String[] userData = geometry.getUserData().toString().split("\t");
+                        wkt.add(geometry.toText());
+                        Map<String, String> map = new HashMap<>();
+                        for (int i=0; i<dbf_fields.size(); i++)
+                            map.put(dbf_fields.get(i), userData[i]);
+                        listMap.add(map);
+                    }
+                    try {
+                        SparkShpToRdf conv = new SparkShpToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, listMap, wkt);
+                        conv.apply();
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
 
         }
     }
