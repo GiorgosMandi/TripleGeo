@@ -8,10 +8,15 @@ package eu.slipo.athenarc.triplegeo;
 
 import com.linuxense.javadbf.DBFField;
 import com.linuxense.javadbf.DBFReader;
+import com.univocity.parsers.common.record.Record;
+import com.univocity.parsers.csv.CsvParser;
+import com.univocity.parsers.csv.CsvParserSettings;
 import com.vividsolutions.jts.geom.Geometry;
 import eu.slipo.athenarc.triplegeo.tools.MapToRdf;
 import eu.slipo.athenarc.triplegeo.utils.*;
+import org.apache.commons.io.ByteOrderMark;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.input.BOMInputStream;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.TaskContext;
@@ -25,6 +30,7 @@ import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
 import org.datasyslab.geospark.spatialRDD.SpatialRDD;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import scala.Tuple2;
 
@@ -174,23 +180,24 @@ public class SparkExtractor {
 
                 spatialRDD.rawSpatialRDD
                         .repartition(num_partitions)
-                        .map((Function<Geometry, Tuple2<String, Map>>) geometry -> {
+                        .map((Function<Geometry, Map>) geometry -> {
 
                             String[] userData = geometry.getUserData().toString().split("\t");
                             String wkt = geometry.toText();
                             Map<String, String> map = new HashMap<>();
+                            map.put("wkt_geometry", wkt);
                             for (int i = 0; i < dbf_fields.size(); i++)
                                 map.put(dbf_fields.get(i), userData[i]);
 
-                            return new Tuple2(wkt, map);
+                            return map;
                         })
-                    .foreachPartition((VoidFunction<Iterator<Tuple2<String, Map>>>) tuple_iter -> {
+                    .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
                         int partion_index = TaskContext.getPartitionId();
                         outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
                         String outFile = outputFiles.get(outputFiles.size() - 1);
                         outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
 
-                        MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, tuple_iter);
+                        MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
                         conv.apply();
                     });
             }
