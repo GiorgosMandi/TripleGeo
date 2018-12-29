@@ -24,6 +24,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.*;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.datasyslab.geospark.formatMapper.shapefileParser.ShapefileReader;
 import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
@@ -32,6 +33,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
+import scala.Function1;
 import scala.Tuple2;
 
 
@@ -181,14 +184,12 @@ public class SparkExtractor {
                 spatialRDD.rawSpatialRDD
                         .repartition(num_partitions)
                         .map((Function<Geometry, Map>) geometry -> {
-
                             String[] userData = geometry.getUserData().toString().split("\t");
                             String wkt = geometry.toText();
                             Map<String, String> map = new HashMap<>();
                             map.put("wkt_geometry", wkt);
                             for (int i = 0; i < dbf_fields.size(); i++)
                                 map.put(dbf_fields.get(i), userData[i]);
-
                             return map;
                         })
                     .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
@@ -200,6 +201,33 @@ public class SparkExtractor {
                         MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
                         conv.apply();
                     });
+            }
+            else if (currentFormat.equals("CSV")){
+
+                Dataset df = session.read()
+                        .format("csv")
+                        .option("header", "true")
+                        .option("delimiter", String.valueOf(currentConfig.delimiter))
+                        .csv(inputFile.split(";"));
+
+                String[] columns = df.columns();
+                df.javaRDD()
+                        .repartition(num_partitions)
+                        .map((Function<Row, Map>) row -> {
+                            Map<String,String> map = new HashMap<>();
+                            for(int i=0; i<columns.length; i++)
+                                map.put(columns[i], row.get(i).toString());
+                            return map;
+                        })
+                        .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
+                            int partion_index = TaskContext.getPartitionId();
+                            outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
+                            String outFile = outputFiles.get(outputFiles.size() - 1);
+                            outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
+
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
+                            conv.apply();
+                        });
             }
         }
     }
