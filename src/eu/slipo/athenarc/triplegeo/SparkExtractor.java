@@ -9,37 +9,24 @@ package eu.slipo.athenarc.triplegeo;
 import com.linuxense.javadbf.DBFField;
 import com.linuxense.javadbf.DBFReader;
 import com.vividsolutions.jts.geom.Geometry;
-import eu.slipo.athenarc.triplegeo.tools.SparkShpToRdf;
+import eu.slipo.athenarc.triplegeo.tools.MapToRdf;
 import eu.slipo.athenarc.triplegeo.utils.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.TaskContext;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.ForeachFunction;
-import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.api.java.function.*;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.datasyslab.geospark.formatMapper.shapefileParser.ShapefileReader;
 import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
 import org.datasyslab.geospark.spatialRDD.SpatialRDD;
-import org.datasyslab.geosparksql.utils.Adapter;
-import org.datasyslab.geosparksql.utils.DataFrameFactory;
-
-import org.geotools.data.DataUtilities;
-import org.geotools.feature.FeatureIterator;
-import org.geotools.feature.simple.SimpleFeatureBuilder;
-import org.geotools.feature.simple.SimpleFeatureImpl;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
-
-
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
+import scala.Tuple2;
 
 
 public class SparkExtractor {
@@ -142,27 +129,7 @@ public class SparkExtractor {
             //----------------------------------------------------------------------------------------------------------
             //----------------------------------------------------------------------------------------------------------
 
-            System.out.println(inputFile);
-            InputChecker ic = new InputChecker(inputFile);
-            if(!ic.check()){
-                System.out.println(ic.getError());
-                System.exit(0);
-            }
-
-            String dbf_file = ic.getFile("dbf");
-            DBFReader dbf_reader;
-            List<String> dbf_fields = new ArrayList<String>();
-            try {
-                dbf_reader = new DBFReader(new FileInputStream(dbf_file));
-                int numberOfFields = dbf_reader.getFieldCount();
-                for (int i = 0; i < numberOfFields; i++) {
-                    DBFField field = dbf_reader.getField(i);
-                    dbf_fields.add(field.getName());
-                }
-            }
-            catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
+            String currentFormat = currentConfig.inputFormat.toUpperCase();
 
             // spark's part
             SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
@@ -179,39 +146,54 @@ public class SparkExtractor {
                     .getOrCreate();
             SparkContext sc = session.sparkContext();
             JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sc);
+            int num_partitions = 3;
 
-            SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
-            spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inputFile);
-
-            spatialRDD.rawSpatialRDD
-                    .repartition(3)
-                    .foreachPartition(new VoidFunction<Iterator<Geometry>>() {
-                @Override
-                public void call(Iterator<Geometry> geometry_iter) {
-                    int partion_index = TaskContext.getPartitionId();
-                    String outFile = outputFiles.get(outputFiles.size() - 1);
-                    outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
-
-                    List<Map<String, String>> listMap = new ArrayList<>();
-                    List<String> wkt = new ArrayList<>();
-                    while (geometry_iter.hasNext()) {
-                        Geometry geometry = geometry_iter.next();
-                        String[] userData = geometry.getUserData().toString().split("\t");
-                        wkt.add(geometry.toText());
-                        Map<String, String> map = new HashMap<>();
-                        for (int i=0; i<dbf_fields.size(); i++)
-                            map.put(dbf_fields.get(i), userData[i]);
-                        listMap.add(map);
-                    }
-                    try {
-                        SparkShpToRdf conv = new SparkShpToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, listMap, wkt);
-                        conv.apply();
-                    } catch (ClassNotFoundException e) {
-                        e.printStackTrace();
-                    }
+            if (currentFormat.equals("SHAPEFILE")) {
+                InputChecker ic = new InputChecker(inputFile);
+                if (!ic.check()) {
+                    System.out.println(ic.getError());
+                    System.exit(0);
                 }
-            });
 
+                String dbf_file = ic.getFile("dbf");
+                DBFReader dbf_reader;
+                List<String> dbf_fields = new ArrayList<String>();
+                try {
+                    dbf_reader = new DBFReader(new FileInputStream(dbf_file));
+                    int numberOfFields = dbf_reader.getFieldCount();
+                    for (int i = 0; i < numberOfFields; i++) {
+                        DBFField field = dbf_reader.getField(i);
+                        dbf_fields.add(field.getName());
+                    }
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+
+                SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
+                spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inputFile);
+
+                spatialRDD.rawSpatialRDD
+                        .repartition(num_partitions)
+                        .map((Function<Geometry, Tuple2<String, Map>>) geometry -> {
+
+                            String[] userData = geometry.getUserData().toString().split("\t");
+                            String wkt = geometry.toText();
+                            Map<String, String> map = new HashMap<>();
+                            for (int i = 0; i < dbf_fields.size(); i++)
+                                map.put(dbf_fields.get(i), userData[i]);
+
+                            return new Tuple2(wkt, map);
+                        })
+                    .foreachPartition((VoidFunction<Iterator<Tuple2<String, Map>>>) tuple_iter -> {
+                        int partion_index = TaskContext.getPartitionId();
+                        outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
+                        String outFile = outputFiles.get(outputFiles.size() - 1);
+                        outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
+
+                        MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, tuple_iter);
+                        conv.apply();
+                    });
+            }
         }
     }
 }
