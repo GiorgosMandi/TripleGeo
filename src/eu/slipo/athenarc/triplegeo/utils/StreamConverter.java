@@ -44,6 +44,7 @@ import org.geotools.feature.FeatureIterator;
 import org.geotools.feature.simple.SimpleFeatureImpl;
 import org.opengis.feature.Property;
 import org.opengis.referencing.operation.MathTransform;
+
 import org.openrdf.rio.RDFFormat;
 
 import com.vividsolutions.jts.geom.Geometry;
@@ -462,7 +463,7 @@ public class StreamConverter implements Converter {
 			collectTriples();     //Dump any pending results into output file
 		}
 	}
-	
+
 	/**
 	 * Parses a single GPX waypoint/track or a single JSON node and streamlines the resulting triples (including geometric and non-spatial attributes).
 	 * Applicable in STREAM transformation mode.
@@ -474,9 +475,9 @@ public class StreamConverter implements Converter {
 	 * @param targetSRID  Spatial reference system (EPSG code) of geometries in the output RDF triples.
 	 * @param geomType  The type of the geometry (e.g., POINT, POLYGON, etc.)
 	 */
-	public void parse(Assistant myAssistant, String wkt, Map <String, String> attrValues, Classification classific, int targetSRID, String geomType) 
-	{	
-		try {	
+	public void parse(Assistant myAssistant, String wkt, Map <String, String> attrValues, Classification classific, int targetSRID, String geomType)
+	{
+		try {
 			String uri;
 			
 			//Pass this tuple for conversion to RDF triples 
@@ -506,6 +507,74 @@ public class StreamConverter implements Converter {
 			collectTriples();     //Dump any pending results into output file
 		}
 	}
+
+
+
+
+	/**
+	 * Parses a single GPX waypoint/track or a single JSON node and streamlines the resulting triples (including geometric and non-spatial attributes).
+	 * Applicable in STREAM transformation mode.
+	 * Input provided as an individual record. This method is used for input data from GPX or JSON files.
+	 * @param myAssistant  Instantiation of Assistant class to perform auxiliary operations (geometry transformations, auto-generation of UUIDs, etc.)
+	 * @param wkt  Well-Known Text representation of the geometry
+	 * @param attrValues  Attribute values for each thematic (non-spatial) attribute
+	 * @param classific  Instantiation of the classification scheme that assigns categories to input features.
+	 * @param targetSRID  Spatial reference system (EPSG code) of geometries in the output RDF triples.
+	 * @param reproject  CRS transformation parameters to be used in reprojecting a geometry to a target SRID (EPSG code).
+	 * @param geomType  The type of the geometry (e.g., POINT, POLYGON, etc.)
+	 */
+	public void parse(Assistant myAssistant, String wkt, Map<String,String> attrValues, Classification classific, int targetSRID, MathTransform reproject, String geomType)
+	{
+		try {
+			if (wkt == null) {
+				if ((currentConfig.attrGeometry == null) && (currentConfig.attrX != null) && (currentConfig.attrY != null)) {    //In case no single geometry attribute with WKT values is specified, compose WKT from a pair of coordinates
+					String x = attrValues.get(currentConfig.attrX);    //X-ordinate or longitude
+					String y = attrValues.get(currentConfig.attrY);    //Y-ordinate or latitude
+					if ((x != null) && (y != null))
+						wkt = "POINT (" + x + " " + y + ")";
+				} else if (currentConfig.attrGeometry != null)
+					wkt = attrValues.get(currentConfig.attrGeometry);  //ASSUMPTION: Geometry values are given as WKT
+			}
+
+			if (wkt != null)
+			{
+				//CRS transformation
+				if (reproject != null)
+					wkt = myAssistant.wktTransform(wkt, reproject);     //Get transformed WKT representation
+//				    else
+//				        myAssistant.WKT2Geometry(wkt);                      //This is done only for updating the MBR of all geometries
+			}
+
+			String uri;
+			//Pass this tuple for conversion to RDF triples
+			if (currentConfig.attrCategory == null)
+				uri = myGenerator.transform(attrValues, wkt, targetSRID, null);         //There no category specified for this feature,...
+			else
+				uri = myGenerator.transform(attrValues, wkt, targetSRID, classific);	//..., otherwise utilize the user-specified classification hierarchy
+
+
+			//Get a record with basic attribute that will be used for the SLIPO Registry
+			if (myRegister != null)
+				myRegister.createTuple(uri, attrValues, wkt, targetSRID);
+
+			++numRec;
+
+			//Periodically, collect RDF triples resulting from this batch and dump results into output file
+			if (numRec % currentConfig.batch_size == 0)
+			{
+				collectTriples();
+				myAssistant.notifyProgress(numRec);
+			}
+
+		} catch (Exception e) {
+			ExceptionHandler.warn(e, "An error occurred during transformation of an input record.");
+		}
+		finally {
+			collectTriples();     //Dump any pending results into output file
+		}
+	}
+
+
 		
 	/**
 	 * Collects RDF triples generated from a batch of features (their thematic attributes and their geometries) and streamlines them to output file.

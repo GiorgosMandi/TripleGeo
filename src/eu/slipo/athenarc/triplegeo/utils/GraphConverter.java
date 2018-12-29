@@ -473,6 +473,23 @@ public class GraphConverter implements Converter {
 		
 	}
 
+
+	/**
+	 * Parses a single GPX waypoint/track or a single JSON node and streamlines the resulting triples (including geometric and non-spatial attributes).
+	 * Applicable in STREAM transformation mode.
+	 * Input provided as an individual record. This method is used for input data from GPX or JSON files.
+	 * @param myAssistant  Instantiation of Assistant class to perform auxiliary operations (geometry transformations, auto-generation of UUIDs, etc.)
+	 * @param wkt  Well-Known Text representation of the geometry
+	 * @param attrValues  Attribute values for each thematic (non-spatial) attribute
+	 * @param classific  Instantiation of the classification scheme that assigns categories to input features.
+	 * @param targetSRID  Spatial reference system (EPSG code) of geometries in the output RDF triples.
+	 * @param reproject  CRS transformation parameters to be used in reprojecting a geometry to a target SRID (EPSG code).
+	 * @param geomType  The type of the geometry (e.g., POINT, POLYGON, etc.)
+	 */
+	public void parse(Assistant myAssistant, String wkt, Map<String,String> attrValues, Classification classific, int targetSRID, MathTransform reproject, String geomType) {
+
+	}
+
 	/**
 	 * 	Collects RDF triples generated from a given feature (its thematic attributes and its geometry) and stores them into the disk-based RDF graph.
 	 */
