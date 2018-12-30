@@ -263,6 +263,12 @@ public final class Configuration {
    */
   public int dbPort;
 
+
+  /**
+   * Spark parameter for the number of partitions.
+   */
+  public int partitions;
+
  
   /**
    * Constructor of a Configuration object.
@@ -481,6 +487,11 @@ public final class Configuration {
     if (!myAssistant.isNullOrEmpty(properties.getProperty("defaultLang"))) {
         defaultLang = properties.getProperty("defaultLang").trim();
       }
+
+    if (!myAssistant.isNullOrEmpty(properties.getProperty("partitions"))) {
+        partitions = Integer.parseInt(properties.getProperty("partitions"));
+    }
+    else partitions = 0;
     
   }
 

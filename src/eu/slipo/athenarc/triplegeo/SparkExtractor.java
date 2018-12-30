@@ -8,15 +8,10 @@ package eu.slipo.athenarc.triplegeo;
 
 import com.linuxense.javadbf.DBFField;
 import com.linuxense.javadbf.DBFReader;
-import com.univocity.parsers.common.record.Record;
-import com.univocity.parsers.csv.CsvParser;
-import com.univocity.parsers.csv.CsvParserSettings;
 import com.vividsolutions.jts.geom.Geometry;
 import eu.slipo.athenarc.triplegeo.tools.MapToRdf;
 import eu.slipo.athenarc.triplegeo.utils.*;
-import org.apache.commons.io.ByteOrderMark;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.input.BOMInputStream;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.TaskContext;
@@ -31,11 +26,8 @@ import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
 import org.datasyslab.geospark.spatialRDD.SpatialRDD;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import scala.Function1;
-import scala.Tuple2;
 
 
 public class SparkExtractor {
@@ -139,6 +131,7 @@ public class SparkExtractor {
             //----------------------------------------------------------------------------------------------------------
 
             String currentFormat = currentConfig.inputFormat.toUpperCase();
+            int num_partitions = currentConfig.partitions != 0 ? currentConfig.partitions : 3;
 
             // spark's part
             SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
@@ -155,7 +148,6 @@ public class SparkExtractor {
                     .getOrCreate();
             SparkContext sc = session.sparkContext();
             JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sc);
-            int num_partitions = 3;
 
             if (currentFormat.equals("SHAPEFILE")) {
                 InputChecker ic = new InputChecker(inputFile);
@@ -192,15 +184,15 @@ public class SparkExtractor {
                                 map.put(dbf_fields.get(i), userData[i]);
                             return map;
                         })
-                    .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
-                        int partion_index = TaskContext.getPartitionId();
-                        outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
-                        String outFile = outputFiles.get(outputFiles.size() - 1);
-                        outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
+                        .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
+                            int partion_index = TaskContext.getPartitionId();
+                            outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
+                            String outFile = outputFiles.get(outputFiles.size() - 1);
+                            outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
 
-                        MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
-                        conv.apply();
-                    });
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
+                            conv.apply();
+                        });
             }
             else if (currentFormat.equals("CSV")){
 
