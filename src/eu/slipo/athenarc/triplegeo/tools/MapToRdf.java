@@ -1,17 +1,13 @@
 package eu.slipo.athenarc.triplegeo.tools;
 
 import eu.slipo.athenarc.triplegeo.utils.*;
-
 import org.geotools.factory.Hints;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.ReferencingFactoryFinder;
 import org.opengis.referencing.crs.CRSAuthorityFactory;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
-import scala.Tuple2;
-
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 
@@ -75,14 +71,16 @@ public class MapToRdf {
                 //Mode STREAM: consume records and streamline them into a serialization file
                 myConverter = new StreamConverter(currentConfig, outputFile);
                 while (data.hasNext()) {
+                    String wkt = null;
+                    String geomType = null;
                     Map<String, String> map = data.next();
-                    if (currentConfig.inputFormat.equals("SHAPEFILE")){
-                        String wkt = map.get("wkt_geometry");
+                    if (currentConfig.inputFormat.equals("SHAPEFILE") || currentConfig.inputFormat.equals("GEOJSON")){
+                        wkt = map.get("wkt_geometry");
                         map.remove("wkt_geometry");
-                        String geomType = wkt.split(" ")[0];
-                        //Export data in a streaming fashion
-                        myConverter.parse(myAssistant, wkt, map, classification, targetSRID, reproject, geomType);
+                        geomType = wkt.split(" ")[0];
                     }
+                    //Export data in a streaming fashion
+                    myConverter.parse(myAssistant, wkt, map, classification, targetSRID, reproject, geomType);
                 }
             }
         } catch (Exception e) {
