@@ -24,6 +24,10 @@ import org.apache.spark.sql.SparkSession;
 import org.datasyslab.geospark.formatMapper.shapefileParser.ShapefileReader;
 import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator;
 import org.datasyslab.geospark.spatialRDD.SpatialRDD;
+import org.apache.spark.sql.functions;
+import scala.collection.mutable.WrappedArray;
+
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
@@ -209,6 +213,55 @@ public class SparkExtractor {
                             Map<String,String> map = new HashMap<>();
                             for(int i=0; i<columns.length; i++)
                                 map.put(columns[i], row.get(i).toString());
+                            return map;
+                        })
+                        .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
+                            int partion_index = TaskContext.getPartitionId();
+                            outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
+                            String outFile = outputFiles.get(outputFiles.size() - 1);
+                            outFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partion_index).toString();
+
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, outFile, sourceSRID, targetSRID, map_iter);
+                            conv.apply();
+                        });
+            }
+            else if (currentFormat.equals("GEOJSON")){
+                Dataset df = session.read()
+                        .option("multiLine", true)
+                        .json(inputFile.split(";"));
+
+                Dataset featuresDF = df.withColumn("features", functions.explode(df.col("features")));
+                Dataset DataDF = featuresDF.select(
+                        featuresDF.col("features.properties").getItem(currentConfig.attrKey).as("key"),
+                        featuresDF.col("features.properties").getItem(currentConfig.attrName).as("name"),
+                        featuresDF.col("features.properties").getItem(currentConfig.attrCategory).as("category"),
+                        featuresDF.col("features.geometry").getItem("type").as("geom_type"),
+                        featuresDF.col("features.geometry").getItem("coordinates").as("coordinates")
+                        );
+                DataDF.show();
+                String[] columns = DataDF.columns();
+
+                DataDF.javaRDD()
+                        .repartition(num_partitions)
+                        .map((Function<Row, Map>) row -> {
+                            Map<String,String> map = new HashMap<>();
+                            String geomType = null;
+                            for(int i=0; i<columns.length; i++) {
+                                if (columns[i].equals("geom_type"))
+                                    geomType = row.get(i).toString();
+                                else if(columns[i].equals("coordinates")){
+                                    String coord = ((WrappedArray)row.get(i)).mkString(" ");
+                                    String wkt = geomType.toUpperCase() + " (" + coord + ")";
+                                    map.put("wkt_geometry", wkt);
+                                }
+                                else {
+                                    try {
+                                        map.put(columns[i], row.get(i).toString());
+                                    }catch (NullPointerException e){
+                                        map.put(columns[i], null);
+                                    }
+                                }
+                            }
                             return map;
                         })
                         .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
