@@ -10,6 +10,11 @@ import org.opengis.referencing.operation.MathTransform;
 import java.util.Iterator;
 import java.util.Map;
 
+/**
+ * Main entry point of the utility for extracting RDF triples from a Map.
+ * @author Georgios Mandilaras
+ * @version 1.6
+ */
 
 public class MapToRdf {
 

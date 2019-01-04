@@ -7,6 +7,7 @@ import java.io.*;
 /**
  *  Checks if the input of the user is correct.
  *  The input must be a folder that contains the shapefile.
+ *  @author Georgios Mandilaras
  */
 public class InputChecker {
 

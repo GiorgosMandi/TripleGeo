@@ -6,6 +6,10 @@ package eu.slipo.athenarc.triplegeo;
 // java -cp ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar eu.slipo.athenarc.triplegeo.Extractor test/conf/shp_options.conf
 
 
+/**
+ * Entry point to TripleGeo for converting from various input formats (Spark EXECUTION)
+ * @author Georgios Mandilaras
+ */
 import eu.slipo.athenarc.triplegeo.utils.*;
 import org.apache.commons.io.FilenameUtils;
 import java.util.*;
@@ -21,11 +25,13 @@ public class SparkExtractor {
     static int sourceSRID;                              //Source CRS according to EPSG
     static int targetSRID;                              //Target CRS according to EPSG
 
+    /**
+     * Main entry point to execute the transformation process.
+     * @param args  Arguments for the execution, including the path to a configuration file.
+     * @throws InterruptedException
+     */
     public static void main(String[] args)  {
         System.out.println(Constants.COPYRIGHT);
-
-        boolean failure = false;                       //Indicates whether at least one task has failed to conclude
-
         if (args.length >= 0) {
 
             myAssistant = new Assistant();
@@ -110,10 +116,13 @@ public class SparkExtractor {
             for (int i=0; i< outputFiles.size(); i++)
                 outputFiles.set(i, outputFiles.get(i).replaceAll("[0-9]", ""));
             String outFile = outputFiles.get(outputFiles.size() - 1);
+
             long start = System.currentTimeMillis();
+
             new SparkTask(currentConfig, classification, inputFile, outFile, sourceSRID, targetSRID);
+
             long elapsed = System.currentTimeMillis() - start;
-            //TODO fix the output filenames
+
             System.out.println(myAssistant.getGMTime() + String.format(" Transformation process concluded successfully in %d ms.", elapsed));
             //Assistant.mergeFiles(outputFiles, "C:/Development/Java/workspace/TripleGeo/test/output/merged_output.rdf");
             System.exit(0);          //Execution completed successfully

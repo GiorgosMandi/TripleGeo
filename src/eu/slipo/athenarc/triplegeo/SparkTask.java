@@ -28,6 +28,12 @@ import java.util.*;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+/**
+ * Performs a transformation task using Spark, under the given configuration settings
+ * @author Georgios Mandilaras
+ *
+ */
+
 public class SparkTask {
 
     //they must be static in order to be serializable
@@ -43,15 +49,18 @@ public class SparkTask {
 
         int num_partitions = currentConfig.partitions != 0 ? config.partitions : 3;
 
-        // spark's part
+
+
+        //deactivate spark's logger -- set to show warnings and errors
         Logger  rootLogger = Logger.getRootLogger();
         rootLogger.setLevel(Level.WARN);
+
+        // Initialize spark's variables
         SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
                 .setMaster("local[*]")
                 .set("spark.hadoop.validateOutputSpecs", "false")
                 .set("spark.serializer", KryoSerializer.class.getName())
                 .set("spark.kryo.registrator", GeoSparkKryoRegistrator.class.getName());
-
         SparkSession session = SparkSession
                 .builder()
                 .appName("SparkTripleGeo")
@@ -61,13 +70,19 @@ public class SparkTask {
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sc);
 
         try {
-            //Apply data transformation according to the given input format
+            //Apply data transformation according to the given input format.
+            //During mapping stage, it constructs a Map that contains file's data,
+            //then for each partition calls MapToRdf converter, which implements the rdf transformation.
+
             if (currentFormat.trim().contains("SHAPEFILE")) {
+
+                //Checks if all the necessary files of a shapefile are included into the folder.
                 InputChecker ic = new InputChecker(inFile);
                 if (!ic.check()) {
                     throw new IllegalArgumentException(ic.getError());
                 }
 
+                //reads dbf file's headers.
                 String dbf_file = ic.getFile("dbf");
                 DBFReader dbf_reader;
                 List<String> dbf_fields = new ArrayList<String>();
@@ -82,6 +97,7 @@ public class SparkTask {
                     e.printStackTrace();
                 }
 
+                //using GeoSpark in order to read shapefiles.
                 SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
                 spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inFile);
 
@@ -107,6 +123,7 @@ public class SparkTask {
 
             }
             else if (currentFormat.trim().contains("CSV")) {
+                //Stores csv in a dataframe
                 Dataset df = session.read()
                         .format("csv")
                         .option("header", "true")
@@ -135,7 +152,7 @@ public class SparkTask {
                 Dataset df = session.read()
                         .option("multiLine", true)
                         .json(inFile.split(";"));
-
+                //Stores Geojson in a dataFrame and keeps only the necessary fields.
                 Dataset featuresDF = df.withColumn("features", functions.explode(df.col("features")));
                 Dataset DataDF = featuresDF.select(
                         featuresDF.col("features.properties").getItem(currentConfig.attrKey).as("key"),
@@ -144,7 +161,7 @@ public class SparkTask {
                         featuresDF.col("features.geometry").getItem("type").as("geom_type"),
                         featuresDF.col("features.geometry").getItem("coordinates").as("coordinates")
                 );
-                DataDF.show();
+                //DataDF.show();
                 String[] columns = DataDF.columns();
 
                 DataDF.javaRDD()
