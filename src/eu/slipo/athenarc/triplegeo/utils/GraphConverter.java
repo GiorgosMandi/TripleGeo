@@ -475,9 +475,9 @@ public class GraphConverter implements Converter {
 
 
 	/**
-	 * Parses a single GPX waypoint/track or a single JSON node and streamlines the resulting triples (including geometric and non-spatial attributes).
+	 * Parses a Map node and streamlines the resulting triples (including geometric and non-spatial attributes).
 	 * Applicable in STREAM transformation mode.
-	 * Input provided as an individual record. This method is used for input data from GPX or JSON files.
+	 * Input provided as an individual record. This method is used in Spark implementation.
 	 * @param myAssistant  Instantiation of Assistant class to perform auxiliary operations (geometry transformations, auto-generation of UUIDs, etc.)
 	 * @param wkt  Well-Known Text representation of the geometry
 	 * @param attrValues  Attribute values for each thematic (non-spatial) attribute
@@ -485,8 +485,10 @@ public class GraphConverter implements Converter {
 	 * @param targetSRID  Spatial reference system (EPSG code) of geometries in the output RDF triples.
 	 * @param reproject  CRS transformation parameters to be used in reprojecting a geometry to a target SRID (EPSG code).
 	 * @param geomType  The type of the geometry (e.g., POINT, POLYGON, etc.)
+	 * @param partition_index  The index of the partition.
+	 * @param outputFile  Path to the output file that collects RDF triples.
 	 */
-	public void parse(Assistant myAssistant, String wkt, Map<String,String> attrValues, Classification classific, int targetSRID, MathTransform reproject, String geomType) {
+	public void parse(Assistant myAssistant, String wkt, Map<String,String> attrValues, Classification classific, int targetSRID, MathTransform reproject, String geomType, int partition_index, String outputFile) {
 
 	}
 
@@ -572,6 +574,16 @@ public class GraphConverter implements Converter {
 	    dt = System.currentTimeMillis() - t_start;
 	    myAssistant.reportStatistics(dt, numRec, numStmt, currentConfig.serialization, myGenerator.getStatistics(), currentConfig.mode, currentConfig.targetCRS, outputFile);
 	    myGenerator.getStatistics();
+	}
+
+	/**
+	 * Finalizes storage of resulting tuples into a file. Used in Spark implementation.
+	 * @param myAssistant  Instantiation of Assistant class to perform auxiliary operations (geometry transformations, auto-generation of UUIDs, etc.)
+	 * @param outputFile  Path to the output file that collects RDF triples.
+	 * @param partition_index  The index of the partition.
+	 */
+	public void store(Assistant myAssistant, String outputFile, int partition_index) {
+
 	}
 			
 
