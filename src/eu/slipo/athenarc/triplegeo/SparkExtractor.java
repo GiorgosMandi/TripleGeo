@@ -107,14 +107,14 @@ public class SparkExtractor {
             //----------------------------------------------------------------------------------------------------------
 
             outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
+            for (int i=0; i< outputFiles.size(); i++)
+                outputFiles.set(i, outputFiles.get(i).replaceAll("[0-9]", ""));
             String outFile = outputFiles.get(outputFiles.size() - 1);
             long start = System.currentTimeMillis();
             new SparkTask(currentConfig, classification, inputFile, outFile, sourceSRID, targetSRID);
             long elapsed = System.currentTimeMillis() - start;
             //TODO fix the output filenames
-            //TODO myAssistant prints
             System.out.println(myAssistant.getGMTime() + String.format(" Transformation process concluded successfully in %d ms.", elapsed));
-            System.out.println("RDF results written into the following output files:" + outputFiles.toString());
             //Assistant.mergeFiles(outputFiles, "C:/Development/Java/workspace/TripleGeo/test/output/merged_output.rdf");
             System.exit(0);          //Execution completed successfully
         }
