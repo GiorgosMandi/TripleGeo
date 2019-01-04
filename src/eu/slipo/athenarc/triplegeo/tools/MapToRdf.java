@@ -23,13 +23,14 @@ public class MapToRdf {
     String outputFile;                         //Output RDF file
 
     private Iterator<Map<String,String>> data;
+    private int partition_index;
 
 
     //Initialize a CRS factory for possible reprojections
     private static final CRSAuthorityFactory crsFactory = ReferencingFactoryFinder
             .getCRSAuthorityFactory("EPSG", new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE));
 
-    public MapToRdf(Configuration config, Classification classific, String outFile, int sourceSRID, int targetSRID, Iterator<Map<String,String>> input) throws ClassNotFoundException {
+    public MapToRdf(Configuration config, Classification classific, String outFile, int sourceSRID, int targetSRID, Iterator<Map<String,String>> input, int index) throws ClassNotFoundException {
 
         this.currentConfig = config;
         this.classification = classific;
@@ -38,6 +39,7 @@ public class MapToRdf {
         this.targetSRID = targetSRID;
         myAssistant = new Assistant();
         this.data = input;
+        this.partition_index = index;
         //Check if a coordinate transform is required for geometries
         if (currentConfig.targetCRS != null) {
             try {
@@ -80,8 +82,10 @@ public class MapToRdf {
                         geomType = wkt.split(" ")[0];
                     }
                     //Export data in a streaming fashion
-                    myConverter.parse(myAssistant, wkt, map, classification, targetSRID, reproject, geomType);
+                    myConverter.parse(myAssistant, wkt, map, classification, targetSRID, reproject, geomType, partition_index, outputFile);
                 }
+                //Store results to file
+                myConverter.store(myAssistant, outputFile, partition_index);
             }
         } catch (Exception e) {
             ExceptionHandler.abort(e, "");

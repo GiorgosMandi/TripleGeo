@@ -25,6 +25,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 public class SparkTask {
 
     //they must be static in order to be serializable
@@ -41,6 +44,8 @@ public class SparkTask {
         int num_partitions = currentConfig.partitions != 0 ? config.partitions : 3;
 
         // spark's part
+        Logger  rootLogger = Logger.getRootLogger();
+        rootLogger.setLevel(Level.WARN);
         SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
                 .setMaster("local[*]")
                 .set("spark.hadoop.validateOutputSpecs", "false")
@@ -95,8 +100,9 @@ public class SparkTask {
                             int partition_index = TaskContext.getPartitionId();
                             String partitions_outputFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partition_index).toString();
 
-                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter);
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter, partition_index);
                             conv.apply();
+                            System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
 
             }
@@ -120,8 +126,9 @@ public class SparkTask {
                             int partition_index = TaskContext.getPartitionId();
                             String partitions_outputFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partition_index).toString();
 
-                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter);
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter, partition_index);
                             conv.apply();
+                            System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
             }
             else if (currentFormat.trim().contains("GEOJSON")) {
@@ -167,8 +174,9 @@ public class SparkTask {
                             int partition_index = TaskContext.getPartitionId();
                             String partitions_outputFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partition_index).toString();
 
-                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter);
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter, partition_index);
                             conv.apply();
+                            System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
             }
             else {
