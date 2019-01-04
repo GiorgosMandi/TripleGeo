@@ -291,6 +291,17 @@ public class Assistant {
 		    System.out.print(this.getGMTime() + " " + Thread.currentThread().getName() + " Processed " +  numRec + " records..." + "\r");
 	}
 
+    /**
+     * Notifies the user about progress in parsing input records. Used in spark implementation.
+     * @param numRec  The number of records processed so far.
+     * @param partition_index  The index of the partition.
+     */
+	public void notifyProgress(int numRec, int partition_index) {
+
+		if (numRec % 1000 == 0)
+			System.out.print(this.getGMTime() + " Worker " + partition_index + " Processed " +  numRec + " records..." + "\r");
+	}
+
 	
 	/**
 	 * Report statistics upon termination of the transformation process.
@@ -345,6 +356,62 @@ public class Assistant {
 	    } catch (Exception e) {
 	        e.printStackTrace();
 	    }	
+	}
+
+	/**
+	 * Report statistics upon termination of the transformation process.
+	 * @param dt  The clock time (in milliseconds) elapsed since the start of transformation process.
+	 * @param numRec  The total number of records that have been processed.
+	 * @param numTriples  The number of RDF triples resulted from transformation.
+	 * @param serialization  A string with the user-specified serialization of output triples.
+	 * @param attrStatistics  Statistics collected per attribute during transformation.
+	 * @param mode  Transformation mode, as specified in the configuration.
+	 * @param targetSRID  Output spatial reference system (CRS).
+	 * @param outputFile  Path to the output file containing the RDF triples.
+	 * @param partition_index  The index of the partition.
+	 */
+	public void reportStatistics(long dt, int numRec, int numTriples, String serialization, Map<String, Integer> attrStatistics, String mode, String targetSRID, String outputFile, int partition_index) {
+
+		System.out.println(this.getGMTime() + " Worker " + partition_index + " completed successfully in " + dt + " ms. " + numRec + " records transformed into " + numTriples + " triples and exported to " + serialization + " file: " + outputFile + ".");
+
+		if (mbr != null)
+			System.out.println("MBR of transformed geometries: X_min=" + mbr.getMinX() + ", Y_min=" + mbr.getMinY() + ", X_max=" + mbr.getMaxX() + ", Y_max=" + mbr.getMaxY());
+
+		//Metadata regarding execution of this process
+		Map<String, Object> execStatistics = new HashMap<String, Object>();
+		execStatistics.put("Execution time (ms)", dt);
+		execStatistics.put("Input record count", numRec);
+		execStatistics.put("Output triple count", numTriples);
+		execStatistics.put("Output serialization", serialization);
+		if (targetSRID != null)
+			execStatistics.put("Output CRS", "EPSG:" + targetSRID);
+		else
+			execStatistics.put("Output CRS", "EPSG:4326");             //Assuming default CRS: WGS84
+		execStatistics.put("Output file", outputFile);
+		execStatistics.put("Transformation mode", mode);
+
+		//MBR of transformed geometries
+		Map<String, Object> mapMBR = new HashMap<String, Object>();
+		if (mbr != null) {
+			mapMBR.put("X_min", mbr.getMinX());
+			mapMBR.put("Y_min", mbr.getMinY());
+			mapMBR.put("X_max", mbr.getMaxX());
+			mapMBR.put("Y_max", mbr.getMaxY());
+		}
+
+		//Compile all metadata together
+		Map<String, Object> allStats = new HashMap<String, Object>();
+		allStats.put("Execution Metadata", execStatistics);
+		allStats.put("MBR of transformed geometries (WGS84)", mapMBR);
+		allStats.put("Attribute Statistics", new TreeMap<String, Integer>(attrStatistics));     //Sort collection by attribute name
+
+		//Convert metadata to JSON and write to a file
+		try {
+			ObjectMapper mapper = new ObjectMapper();
+			mapper.writeValue(new File(FilenameUtils.removeExtension(outputFile) + "_metadata.json"), allStats);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 
