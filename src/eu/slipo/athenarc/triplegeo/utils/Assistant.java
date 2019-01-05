@@ -727,7 +727,7 @@ public class Assistant {
 	/**
 	 * Add the linestring given to the polygonizer
 	 * 
-	 * @param linestring line string
+	 * @param lineString line string
 	 * @param polygonizer polygonizer
 	 */
 	public void addLineString(LineString lineString, Polygonizer polygonizer){
@@ -1145,6 +1145,96 @@ public class Assistant {
 		
 		 return res; 
 	}
-	
-	
+
+
+	/**
+	 * Checks if the the input is correct.
+	 * The  input must be a directory that contains all the necessary shapefiles.
+	 * @param inputFolder the path to the input folder.
+	 * @return true or false if the input is correct.
+	 */
+	public boolean check_ShapefileFolder(String inputFolder) {
+		File dir = new File(inputFolder);
+
+		if (!dir.exists()) {
+			System.out.println("Error: Folder does not exist.");
+			return false;
+		}
+		boolean isDirectory = dir.isDirectory();
+		if (isDirectory) {
+			return check_ShapeFiles(inputFolder);
+		} else {
+			System.out.println("Error: The input must be a folder that will contain the shapefile.");
+			return false;
+		}
+	}
+
+	/**
+	 * Checks if folder contains the necessary files of Shapefile.
+	 * The files must have the same name with the folder.
+	 * @param inputFolder the path to the input folder.
+	 * @return true or false if the folder contains the necessary files.
+	 */
+	private boolean check_ShapeFiles(String inputFolder) {
+		File dir = new File(inputFolder);
+		File[] directoryListing = dir.listFiles();
+		String filename = inputFolder.substring(inputFolder.lastIndexOf("/")+1, inputFolder.length());
+		if (directoryListing != null) {
+			boolean shp_flag = false;
+			boolean dbf_flag = false;
+			boolean shx_flag = false;
+			for (File child : directoryListing) {
+				String childName = child.getName().substring(0, child.getName().lastIndexOf("."));
+				if (!childName.equals(filename))
+					continue;
+				String extension = FilenameUtils.getExtension(child.getAbsolutePath());
+				switch (extension) {
+					case "shp":
+						shp_flag = true;
+						break;
+					case "dbf":
+						dbf_flag = true;
+						break;
+					case "shx":
+						shx_flag = true;
+						break;
+				}
+			}
+			if (shp_flag && dbf_flag && shx_flag)
+				return true;
+			else {
+				System.out.println("Error: Necessary files are missing.");
+				return false;
+			}
+		} else {
+			System.out.println("Error: Necessary files are missing.");
+			return false;
+		}
+	}
+
+	/**
+	 * Returns the absolute path of the requested file.
+	 * @param extension: the extension of the file that will search for.
+	 * @param inputFolder the path to the input folder.
+	 * @return the absolute path of the requested file
+	 */
+	public String get_ShapeFile(String extension, String inputFolder) {
+		File dir = new File(inputFolder);
+		File[] directoryListing = dir.listFiles();
+		if (directoryListing != null) {
+			for (File child : directoryListing) {
+				String child_extension = FilenameUtils.getExtension(child.getAbsolutePath());
+				if (extension.equals("dbf") && child_extension.equals("dbf"))
+					return child.getAbsolutePath();
+				if (extension.equals("shp") && child_extension.equals("shp"))
+					return child.getAbsolutePath();
+				if (extension.equals("shx") && child_extension.equals("shx"))
+					return child.getAbsolutePath();
+			}
+		}
+		return null;
+	}
+
+
+
 }
