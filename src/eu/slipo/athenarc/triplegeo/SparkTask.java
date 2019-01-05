@@ -196,6 +196,36 @@ public class SparkTask {
                             System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
             }
+            else if(currentFormat.trim().contains("JSON")) {
+                Dataset df = session.read()
+                        .option("multiLine", true)
+                        .json(inFile.split(";"));
+                Dataset DataDF = df.select(
+                        df.col(currentConfig.attrKey).as("key"),
+                        df.col(currentConfig.attrName).as("name"),
+                        df.col(currentConfig.attrCategory).as("category"),
+                        df.col(currentConfig.attrX).as(currentConfig.attrX),
+                        df.col(currentConfig.attrY).as(currentConfig.attrY)
+                );
+                String[] columns = DataDF.columns();
+                DataDF.show();
+                DataDF.javaRDD().repartition(num_partitions)
+                        .map((Function<Row, Map>) row -> {
+                            Map<String,String> map = new HashMap<>();
+                            for(int i=0; i<columns.length; i++)
+                                map.put(columns[i], row.get(i).toString());
+                            return map;
+                        })
+                        .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
+                            int partition_index = TaskContext.getPartitionId();
+                            String partitions_outputFile = new StringBuilder(outFile).insert(outFile.lastIndexOf("."), "_" + partition_index).toString();
+
+                            MapToRdf conv = new MapToRdf(currentConfig, classification, partitions_outputFile, sourceSRID, targetSRID, map_iter, partition_index);
+                            conv.apply();
+                            System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
+                        });
+
+            }
             else {
                 throw new IllegalArgumentException(Constants.INCORRECT_SETTING);
             }
