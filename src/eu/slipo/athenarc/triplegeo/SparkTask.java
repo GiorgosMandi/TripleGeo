@@ -45,10 +45,8 @@ public class SparkTask {
         classification = classific;
 
         String currentFormat = currentConfig.inputFormat.toUpperCase();           //Possible values: SHAPEFILE, DBMS, CSV, GPX, GEOJSON, JSON, OSM_XML, OSM_PBF, XML
-
-
         int num_partitions = currentConfig.partitions != 0 ? config.partitions : 3;
-
+        Assistant myAssistant = new Assistant();
 
 
         //deactivate spark's logger -- set to show warnings and errors
@@ -77,13 +75,12 @@ public class SparkTask {
             if (currentFormat.trim().contains("SHAPEFILE")) {
 
                 //Checks if all the necessary files of a shapefile are included into the folder.
-                InputChecker ic = new InputChecker(inFile);
-                if (!ic.check()) {
-                    throw new IllegalArgumentException(ic.getError());
+                if (!myAssistant.check_ShapefileFolder(inFile)) {
+                    System.exit(0);
                 }
 
                 //reads dbf file's headers.
-                String dbf_file = ic.getFile("dbf");
+                String dbf_file = myAssistant.get_ShapeFile("dbf", inFile);
                 DBFReader dbf_reader;
                 List<String> dbf_fields = new ArrayList<String>();
                 try {
