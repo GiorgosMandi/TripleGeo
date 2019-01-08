@@ -41,6 +41,10 @@ public class SparkTask {
     private static Classification classification;
 
     public  SparkTask(Configuration config, Classification classific, String inFile, String outFile, int sourceSRID, int targetSRID) {
+
+        if (inFile.charAt(inFile.length()-1) == '/')
+            inFile = inFile.substring(0, inFile.length()-1);
+
         currentConfig = config;
         classification = classific;
 
