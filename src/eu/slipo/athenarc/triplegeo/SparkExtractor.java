@@ -111,7 +111,8 @@ public class SparkExtractor {
 
             //----------------------------------------------------------------------------------------------------------
             //----------------------------------------------------------------------------------------------------------
-
+            if (inputFile.charAt(inputFile.length()-1) == '/')
+                inputFile = inputFile.substring(0, inputFile.length()-1);
             outputFiles.add(currentConfig.outputDir + FilenameUtils.getBaseName(inputFile) + myAssistant.getOutputExtension(currentConfig.serialization));
             for (int i=0; i< outputFiles.size(); i++)
                 outputFiles.set(i, outputFiles.get(i).replaceAll("[0-9]", ""));
