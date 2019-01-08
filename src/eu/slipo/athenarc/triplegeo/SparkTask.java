@@ -152,13 +152,14 @@ public class SparkTask {
                 //Stores Geojson in a dataFrame and keeps only the necessary fields.
                 Dataset featuresDF = df.withColumn("features", functions.explode(df.col("features")));
                 Dataset DataDF = featuresDF.select(
+                        featuresDF.col("features.type").as("type"),
                         featuresDF.col("features.properties").getItem(currentConfig.attrKey).as("key"),
                         featuresDF.col("features.properties").getItem(currentConfig.attrName).as("name"),
                         featuresDF.col("features.properties").getItem(currentConfig.attrCategory).as("category"),
                         featuresDF.col("features.geometry").getItem("type").as("geom_type"),
                         featuresDF.col("features.geometry").getItem("coordinates").as("coordinates")
                 );
-                //DataDF.show();
+                DataDF.show();
                 String[] columns = DataDF.columns();
 
                 DataDF.javaRDD()
