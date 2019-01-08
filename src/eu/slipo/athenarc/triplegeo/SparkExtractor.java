@@ -2,7 +2,7 @@ package eu.slipo.athenarc.triplegeo;
 
 
 //Execute
-// spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[3] ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar  test/conf/spark_shp_options.conf
+// spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[*] ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar  test/conf/spark_shp_options.conf
 // java -cp ~/Documents/DIT/Thesis/TripleGEO_Extensions/SparkTripleGeo/target/triplegeo-1.6-SNAPSHOT.jar eu.slipo.athenarc.triplegeo.Extractor test/conf/shp_options.conf
 
 
