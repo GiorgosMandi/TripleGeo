@@ -95,18 +95,19 @@ public class SparkTask {
                 }
 
                 //using GeoSpark in order to read shapefiles.
+                System.setProperty("geospark.global.charset","utf8");
                 SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
                 spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inFile);
 
                 spatialRDD.rawSpatialRDD
                         .repartition(num_partitions)
                         .map((Function<Geometry, Map>) geometry -> {
-                            String[] userData = geometry.getUserData().toString().split("\t");
+                            String[] userData = geometry.getUserData().toString().replace(" ","").split("\t");
                             String wkt = geometry.toText();
                             Map<String, String> map = new HashMap<>();
                             map.put("wkt_geometry", wkt);
-                            for (int i = 0; i < dbf_fields.size(); i++)
-                                map.put(dbf_fields.get(i), userData[i]);
+                            for (int i = 0; i < userData.length; i++){
+                                map.put(dbf_fields.get(i), userData[i]);}
                             return map;
                         })
                         .foreachPartition((VoidFunction<Iterator<Map<String, String>>>) map_iter -> {
