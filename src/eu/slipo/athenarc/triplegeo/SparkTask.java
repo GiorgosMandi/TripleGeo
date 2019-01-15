@@ -8,6 +8,7 @@ import eu.slipo.athenarc.triplegeo.utils.*;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.TaskContext;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
@@ -45,13 +46,19 @@ public class SparkTask {
         classification = classific;
 
         String currentFormat = currentConfig.inputFormat.toUpperCase();           //Possible values: SHAPEFILE, DBMS, CSV, GPX, GEOJSON, JSON, OSM_XML, OSM_PBF, XML
-        int num_partitions = currentConfig.partitions != 0 ? config.partitions : 3;
+        int num_partitions = currentConfig.partitions;
         Assistant myAssistant = new Assistant();
 
 
-        //deactivate spark's logger -- set to show warnings and errors
+        //set spark's logger level
         Logger  rootLogger = Logger.getRootLogger();
-        rootLogger.setLevel(Level.WARN);
+        if (currentConfig.spark_logger_level.equals("ERROR"))
+            rootLogger.setLevel(Level.ERROR);
+        else if (currentConfig.spark_logger_level.equals("INFO"))
+            rootLogger.setLevel(Level.INFO);
+        else
+            rootLogger.setLevel(Level.WARN);
+
 
         // Initialize spark's variables
         SparkConf conf = new SparkConf().setAppName("SparkTripleGeo")
@@ -99,8 +106,11 @@ public class SparkTask {
                 SpatialRDD spatialRDD = new SpatialRDD<Geometry>();
                 spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(jsc, inFile);
 
+                if(num_partitions > 0 )
+                    spatialRDD.rawSpatialRDD = spatialRDD.rawSpatialRDD
+                            .repartition(num_partitions);
+
                 spatialRDD.rawSpatialRDD
-                        .repartition(num_partitions)
                         .map((Function<Geometry, Map>) geometry -> {
                             String[] userData = geometry.getUserData().toString().replace(" ","").split("\t");
                             String wkt = geometry.toText();
@@ -129,8 +139,12 @@ public class SparkTask {
                         .csv(inFile.split(";"));
 
                 String[] columns = df.columns();
-                df.javaRDD()
-                        .repartition(num_partitions)
+                JavaRDD df_rdd = df.javaRDD();
+                if(num_partitions > 0 ) {
+                    df_rdd = df_rdd.repartition(num_partitions);
+                }
+
+                df_rdd
                         .map((Function<Row, Map>) row -> {
                             Map<String,String> map = new HashMap<>();
                             for(int i=0; i<columns.length; i++)
@@ -162,9 +176,12 @@ public class SparkTask {
                 );
                 DataDF.show();
                 String[] columns = DataDF.columns();
+                JavaRDD df_rdd = df.javaRDD();
+                if(num_partitions > 0 ) {
+                    df_rdd = df_rdd.repartition(num_partitions);
+                }
 
-                DataDF.javaRDD()
-                        .repartition(num_partitions)
+                df_rdd
                         .map((Function<Row, Map>) row -> {
                             Map<String,String> map = new HashMap<>();
                             String geomType = null;
@@ -208,7 +225,11 @@ public class SparkTask {
                 );
                 String[] columns = DataDF.columns();
                 DataDF.show();
-                DataDF.javaRDD().repartition(num_partitions)
+                JavaRDD df_rdd = df.javaRDD();
+                if(num_partitions > 0 ) {
+                    df_rdd = df_rdd.repartition(num_partitions);
+                }
+                df_rdd
                         .map((Function<Row, Map>) row -> {
                             Map<String,String> map = new HashMap<>();
                             for(int i=0; i<columns.length; i++)
