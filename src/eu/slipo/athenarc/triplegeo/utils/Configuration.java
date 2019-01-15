@@ -269,6 +269,11 @@ public final class Configuration {
    */
   public int partitions;
 
+    /**
+     * Spark parameter, the level of the logger. INFO WARN and ERROR are allowed
+     */
+    public String spark_logger_level;
+
  
   /**
    * Constructor of a Configuration object.
@@ -492,6 +497,10 @@ public final class Configuration {
         partitions = Integer.parseInt(properties.getProperty("partitions"));
     }
     else partitions = 0;
+
+      if (!myAssistant.isNullOrEmpty(properties.getProperty("spark_logger_level"))) {
+          spark_logger_level = properties.getProperty("spark_logger_level").trim();
+      }
     
   }
 
