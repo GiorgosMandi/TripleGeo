@@ -501,7 +501,8 @@ public final class Configuration {
       if (!myAssistant.isNullOrEmpty(properties.getProperty("spark_logger_level"))) {
           spark_logger_level = properties.getProperty("spark_logger_level").trim();
       }
-    
+      else
+          spark_logger_level = "WARN";
   }
 
 }
