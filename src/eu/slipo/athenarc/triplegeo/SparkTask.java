@@ -212,7 +212,7 @@ public class SparkTask {
                             System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
             }
-            else if(currentFormat.trim().contains("JSON")) {
+            /*else if(currentFormat.trim().contains("JSON")) {
                 Dataset df = session.read()
                         .option("multiLine", true)
                         .json(inFile.split(";"));
@@ -245,12 +245,15 @@ public class SparkTask {
                             System.out.println("RDF results written into the following output files:" + partitions_outputFile.toString());
                         });
 
-            }
+            }*/
             else {
                 throw new IllegalArgumentException(Constants.INCORRECT_SETTING);
             }
+            //System.in.read();
+            session.stop();
         } catch (Exception e) {
             ExceptionHandler.abort(e, Constants.INCORRECT_SETTING);      //Execution terminated abnormally
         }
+
     }
 }
