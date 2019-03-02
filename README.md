@@ -10,10 +10,10 @@
 
 
 <h3> In this project we extended TripleGeo to work on top of Apache Spark.</h3>
-<p> It currently supports the conversion of ESRI Shapefiles, GeoJSON and CSV </p>
-<p> <b>Execution:</b> spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[*] <path to the JAR file> <path to the Configuraton file>
+<p> It currently supports the conversion of ESRI Shapefiles, GeoJSON and CSV. </p>
+<p> <b>Execution:</b> spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[*] &lt;path to the JAR file&gt; &lt;path to the Configuraton file&gt;
 <br/>
-<p>This implementation was merged with the original TripleGeo in the version 1.7. TripleGeo is located in this <a href="https://github.com/SLIPO-EU/TripleGeo">repository</a></p>
+<p>This implementation was merged with the original TripleGeo in the 1.7 version. TripleGeo is located in this <a href="https://github.com/SLIPO-EU/TripleGeo">repository</a>.</p>
 
 ---
 
