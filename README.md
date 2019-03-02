@@ -1,3 +1,5 @@
+
+
 <html>
 <HEAD>
 </head>
@@ -5,6 +7,16 @@
 
 <div id="readme" class="clearfix announce instapaper_body md">
 <article class="markdown-body entry-content" itemprop="mainContentOfPage">
+
+
+<h3> In this project we extended TripleGeo to work on top of Apache Spark.</h3>
+<p> It currently supports the conversion of ESRI Shapefiles, GeoJSON and CSV </p>
+<p> <b>Execution:</b> spark-submit --class eu.slipo.athenarc.triplegeo.SparkExtractor --master local[*] <path to the JAR file> <path to the Configuraton file>
+<br/>
+<p>This implementation was merged with the original TripleGeo in the version 1.7. TripleGeo is located in this <a href="https://github.com/SLIPO-EU/TripleGeo">repository</a></p>
+
+---
+
 
 <h2><a name="welcome-to-triplegeo" class="anchor" href="#welcome-to-triplegeo"><span class="octicon octicon-link"></span></a>Welcome to TripleGeo: An open-source tool for transforming geospatial features into RDF triples</h2>
 
